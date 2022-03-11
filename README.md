@@ -1,2 +1,3 @@
 # zero-cycles
-Code used to compute rational equivalences of zero-cycles on algebraic varieties
+
+This repository contains code used to compute rational equivalences of zero-cycles on algebraic varieties. 
