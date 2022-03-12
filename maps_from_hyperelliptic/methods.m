@@ -90,7 +90,7 @@ TensorProd := function(pair, n1, n2)
     return Vector(KroneckerProduct(Matrix([coeffs1]), Matrix([coeffs2])));
 end function;
 
-GrowBasis := procedure(P1, P2, ~C1basis, ~C2basis, ~prod_basis, ~prod_vect_basis)
+GrowBasis := procedure(P, f1, f2, ~C1basis, ~C2basis, ~generators, ~prod_basis, ~prod_vect_basis)
     /* If linearly independent, add Pi to Cibasis (i=1,2).
     If linearly independent, add P1 \otimes P2 to prod_basis 
     (expressed as coefficients in C1basis and C2basis).
@@ -101,8 +101,8 @@ GrowBasis := procedure(P1, P2, ~C1basis, ~C2basis, ~prod_basis, ~prod_vect_basis
     n1 := #C1basis;
     n2 := #C2basis;
 
-    coeffs1, C1basis := GetCoeffs(C1basis, P1);
-    coeffs2, C2basis := GetCoeffs(C2basis, P2);
+    coeffs1, C1basis := GetCoeffs(C1basis, f1(P));
+    coeffs2, C2basis := GetCoeffs(C2basis, f2(P));
 
     if #C1basis gt n1 or #C2basis gt n2 then
         //prod_vect_basis must be redefined using the larger bases
@@ -115,6 +115,7 @@ GrowBasis := procedure(P1, P2, ~C1basis, ~C2basis, ~prod_basis, ~prod_vect_basis
     if n1*n2 gt 0 then
         newvect := TensorProd(<coeffs1, coeffs2>, n1, n2);
         if IsIndependent(Append(prod_vect_basis, newvect)) then
+            Append(~generators, <P, f1, f2>);
             Append(~prod_basis, <coeffs1, coeffs2>);
             Append(~prod_vect_basis, newvect);
         end if;
@@ -155,8 +156,7 @@ ProcessPair := function(C1, C2 : search_bound:=1000, max_rank := 10^10, max_curv
     been processed. Must be an integer from 1 to 6.
     */
 
-    generators := 0;
-
+    generators := [* *];
     C1basis := []; // linearly independent set [P_1,...,P_k] in C1(\Q)
     C2basis := []; // linearly independent set [Q_1,...,Q_l] in C2(\Q)
     prod_basis := []; // linearly independent set in C1(\Q) \otimes C2(\Q), 
@@ -170,7 +170,7 @@ ProcessPair := function(C1, C2 : search_bound:=1000, max_rank := 10^10, max_curv
         C2basis := [psi(P) : P in C1basis];
         prod_basis := [<[i eq j select 1 else 0 : i in [1..#C1basis]], 
                         [i eq j select 1 else 0 : i in [1..#C1basis]]> : j in [1..#C1basis]];
-        generators +:= #C1basis;
+        generators cat:= SequenceToList([<P, IdentityIsogeny(C1), psi> : P in C1basis]);
     end if;
 
     // A modification of prod_basis, used for testing linear independence
@@ -188,24 +188,22 @@ ProcessPair := function(C1, C2 : search_bound:=1000, max_rank := 10^10, max_curv
             Hpts := [P:P in pts | 2*f1(P) ne C1 ! 0 and 2*f2(P) ne C2 ! 0];
             assert #Hpts mod 4 eq 0;
             
-            if #Wpts ne 0 and #Hpts ne 0 then 
-                generators +:= #Hpts / 4;       
+            if #Wpts ne 0 and #Hpts ne 0 then    
                 for P in Hpts do
                     // Add f1(P), f2(P), and f1(P)\otimes f2(P) to C1basis, C2basis, 
                     // and prod_basis, respectively (unless already in the span up to torsion)
-                    GrowBasis(f1(P), f2(P), ~C1basis, ~C2basis, ~prod_basis, ~prod_vect_basis);
+                    GrowBasis(P, f1, f2, ~C1basis, ~C2basis, ~generators, ~prod_basis, ~prod_vect_basis);
                 end for;
             end if;
         end if;
         curvenum +:= 1;
     end while;
-    print prod_vect_basis;
-    assert generators ge #prod_basis;
-    return #prod_basis, generators;
+    assert #generators eq #prod_basis and #prod_basis eq #prod_vect_basis;
+    return generators;
 end function;
 
 
-FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false, progress_markers := 100, max_curves := 6);
+FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false, progress_markers := 100, max_curves := 6, genlist := false);
                             
     /* every element of pairlist is a pair <C1,C2>, where C1,C2 are elliptic 
     curves with fully rational 2-torsion.
@@ -242,10 +240,36 @@ FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false
             curveranks[C2] := r2;
         end if;
         
-        tensorrank, generators := ProcessPair(C1, C2 : search_bound:=search_bound, max_rank := r1*r2, max_curves := max_curves);
-        Append(~alldata, <tensorrank, generators>);
-        if tensorrank eq r1*r2 then Append(~successes, i); end if;
+        generators := ProcessPair(C1, C2 : search_bound:=search_bound, max_rank := r1*r2, max_curves := max_curves);
+        Append(~alldata, genlist select generators else #generators);
+        if #generators eq r1*r2 then Append(~successes, i); end if;
     end for;
     
     return successes, alldata;
+end function;
+
+GenCoeffs := function(genlist)
+    /* TODO: implement TensorForm */
+
+    if #genlist eq 0 then return []; end if;
+
+    C1 := Codomain(genlist[1][2]);
+    C2 := Codomain(genlist[1][3]);
+    C1basis := ReducedBasis(Generators(C1));
+    C2basis := ReducedBasis(Generators(C2));
+    n1 := #C1basis;
+    n2 := #C2basis;
+
+    coeff_list := [];
+    for gen in genlist do
+        P := gen[1];
+        f1 := gen[2];
+        f2 := gen[3];
+
+        coeffs1 := GetCoeffs(C1basis, f1(P));
+        coeffs2 := GetCoeffs(C2basis, f2(P));
+        Append(~coeff_list, <coeffs1, coeffs2>);
+    end for;
+
+    return coeff_list;
 end function;
