@@ -1,5 +1,5 @@
 TranslatedRoots := function(curve : perm:=1)
-    /* given an elliptic curve, return two values a and b such that
+    /* Given an elliptic curve, return two values a and b such that
     curve is isomorphic to y^2=x(x-a)(x-b). Return an error if no rational a,b exist.
 
     Up to scaling, there are 6 possiblities for [a,b], determined by permuting the roots.
@@ -19,8 +19,9 @@ TranslatedRoots := function(curve : perm:=1)
 end function;
 
 HyperWithMaps := function(C1, C2 : option:=1)
-    /* Given elliptic curves C1 and C2, return a genus 2 curve H with maps f1:H->C1 and f2:H->C2. 
-    Return false if the construction fails to produce a valid curve. 
+    /* Given elliptic curves C1 and C2, return a genus 2 curve H and maps f1:H->C1 and f2:H->C2,
+    as in Scholten ia.cr/2018/1137.  
+    Return false if the construction fails to produce a valid hyperelliptic curve. 
     
     In general, there are six non-isomorphic curves H that can be constructed using this technique; 
     parameter option is an integer in [1..6] that designates the choice of curve.*/
@@ -36,9 +37,11 @@ HyperWithMaps := function(C1, C2 : option:=1)
     f2 := Isomorphism(E2,C2);
 
     if a*d-b*c eq 0 then
+        // construction does not yield a valid curve for the given inputs.
         return false, _, _, _;
     end if;
 
+    // see ia.cr/2018/1137 Theorem 1
     PP<x,y,z> := ProjectiveSpace(Rationals(), [1,3,1]);
     Hp := Curve(PP, y^2 - (a*d-b*c)*((a-b)*x^2-(c-d)*z^2)*(a*x^2-c*z^2)*(b*x^2-d*z^2));
     g1 := map<Hp -> E1 | [(a*b*(a-b))/(a*d - b*c) * (x^2 - z^2*(c - d)/(a - b))*z, 
@@ -46,20 +49,22 @@ HyperWithMaps := function(C1, C2 : option:=1)
     g2 := map<Hp -> E2 | [(c*d*(c-d))/(-a*d + b*c) * (z^2 - x^2*(a - b)/(c - d))*x, 
                             (c*d*(c - d))/(-a*d + b*c)^2*y, x^3]>;
 
+    // Replace Hp with an integral model h:H->Hp to allow for point-finding
     tf, Htemp, f := IsHyperelliptic(Hp);
     assert tf;
     H, g := IntegralModel(Htemp);
-    h := Inverse(f*g); // map from H to Hp
+    h := Inverse(f*g);
 
     return true, H, h*g1*f1, h*g2*f2;
 end function;
 
 GetCoeffs := function(basis, P)
-    /* basis: a linearly independent set of points on an ellitic curve E.
+    /* basis: a linearly independent list of points Q_1,...,Q_n on an ellitic curve E.
     P: a point on E.
     
-    If P is in the span of basis (up to torsion), return a list of corresponding coefficients, and basis.
-    Otherwise, return [0,0,...,0,1] (length = #basis+1) and a new basis with P added. */
+    Return a list of integers [a_1,...,a_k] and a linearly independent 
+    list of points [Q_1,...,Q_k] (with either k=n, or k=n+1 and Q_{n+1}=P) 
+    such that a_1*P_1 + ... + a_k*P_k is a multiple of P. */
 
     newptlist := Append(basis,P);
     isindep, v := IsLinearlyIndependent(newptlist);
@@ -74,22 +79,24 @@ GetCoeffs := function(basis, P)
 end function;
 
 TensorProd := function(pair, n1, n2)
-    /* Given a pair of vectors with lengths <=n1 and <=n2, 
-    first pad them on the right with 0s to make them length n1 and n2,
-    then return the tensor product, a vector of length n1*n2. */
+    /* Input non-negative integers n1 and n2, and a pair <v1, v2> of lists 
+    of integers with the lengths of v1 and v2 at most n1 and n2, respectively. 
+
+    Pad v1 and v2 on the right with 0s to make them length n1 and n2,
+    then return their tensor product, a vector of length n1*n2. */
     
     coeffs1 := pair[1] cat [0 : i in [1..n1 - #pair[1]]];
     coeffs2 := pair[2] cat [0 : i in [1..n2 - #pair[2]]];
     return Vector(KroneckerProduct(Matrix([coeffs1]), Matrix([coeffs2])));
 end function;
 
-GrowBasis := procedure(P1, P2, P, ~C1basis, ~C2basis, ~Hpts, ~prod_basis, ~prod_vect_basis)
-    /* Add P1 to C1basis (unless it is already in the span up to torsion);
-    Add P2 to C2basis (unless it is already in the span up to torsion);
-    Add the tensor of P1 and P2 to prod_basis (unless it is already in the span up to torsion).
+GrowBasis := procedure(P1, P2, ~C1basis, ~C2basis, ~prod_basis, ~prod_vect_basis)
+    /* If linearly independent, add Pi to Cibasis (i=1,2).
+    If linearly independent, add P1 \otimes P2 to prod_basis 
+    (expressed as coefficients in C1basis and C2basis).
 
     prod_vect_basis can be recovered as [TensorProd(pair, n1, n2) : pair in prod_basis], but 
-    is passed as an argument to prevent redundantly recreating it many times.*/
+    is passed as an argument to prevent recreating it more often than needed.*/
     
     n1 := #C1basis;
     n2 := #C2basis;
@@ -104,244 +111,141 @@ GrowBasis := procedure(P1, P2, P, ~C1basis, ~C2basis, ~Hpts, ~prod_basis, ~prod_
         prod_vect_basis := [TensorProd(pair, n1, n2) : pair in prod_basis];
     end if;
 
-    //see if we have found an independent element of the tensor product
+    //if P1 \otimes P2 is indepedent of prod_basis, add it.
     if n1*n2 gt 0 then
         newvect := TensorProd(<coeffs1, coeffs2>, n1, n2);
         if IsIndependent(Append(prod_vect_basis, newvect)) then
-            Append(~Hpts, P);
             Append(~prod_basis, <coeffs1, coeffs2>);
             Append(~prod_vect_basis, newvect);
         end if;
     end if;
 end procedure;
 
-ProcessPair := function(C1, C2 : search_bound:=1000, rank1:=-1, rank2:=-1)
-    /* Attempt to prove F^2(C1xC2)_comp is torsion. */
+ProcessPair := function(C1, C2 : search_bound:=1000, max_rank := 10^10, max_curves := 6)
+    /* C1 and C2 are elliptic curves with fully rational 2-torsion.
+    Return non-negative integers "#prod_basis" and "total_orbits."
 
-    success := false;
-    attempt := 1;
-    C1basis := [];
-    C2basis := [];
-    prod_basis := [];
-    Hpts := [];
-    total_orbits := 0;
+    This method produces up to 6 hyperelliptic curves H with maps fi:H->Ci (i=1,2).
+    For each such H that contains a Weierstrass point, let Hpts denote the set of 
+    all points on H that do not map to 2-torsion points on C1 or C2. (By construction
+    of fi, Hpts has no Weierstrass points). There is a group action on each 
+    curve H, and Hpts partitions into orbits of size 4.
 
-    // compute ranks of C1 and C2 if not already given
-    if rank1 eq -1 then rank1 := Rank(C1); end if;
-    if rank2 eq -1 then rank2 := Rank(C2); end if;
+    For non-isogenous C1,C2, "generators" is the sum of #Hpts / 4 (i.e. the total 
+    number of orbits) as H varies over curves with a rational Weierstrass point.
+    If C1,C2 are isogenous, then Rank(C1) is added to generators.
 
-    //Isogenous curves get some automatic contributions
+    Let G be the subgroup of the tensor product C1(\Q)\otimes C2(\Q) generated by 
+    f1(P) \otimes f2(P), where P ranges over Hpts and H varies over all curves
+    with a Weierstrass point; if an isogeny phi:C1->C2 exists, also include in the
+    generating set R\otimes phi(R), for a set of generators R of C1(\Q)/C1(\Q)_tors.
+    The subgroup produced by a point P in Hpts depends only on the orbit of P, so 
+    the number of generators of G is given by "generators." Every element of G maps 
+    to torsion in F^2(C1xC2).
+
+    "#prod_basis" is the rank of G. In particular, if 
+    #prod_basis = rank(C1) * rank(C2), then F^2(C1xC2)_comp is finite. 
+    
+    Parameters:
+    
+    "search_bound": a height bound used for finding rational points on H.
+    "max_rank": stop finding new generators once #prod_basis >= max_rank. 
+    Note that #prod_basis will be the same for any max_rank >= rank(C1)*rank(C2).
+    "max_curves": stop finding new generators once this many curves H have
+    been processed. Must be an integer from 1 to 6.
+    */
+
+    generators := 0;
+
+    C1basis := []; // linearly independent set [P_1,...,P_k] in C1(\Q)
+    C2basis := []; // linearly independent set [Q_1,...,Q_l] in C2(\Q)
+    prod_basis := []; // linearly independent set in C1(\Q) \otimes C2(\Q), 
+    // each element of the form <[a_1,..,a_r], [b_1,..,b_s]> (r <= k, s <= l)
+    // representing (a_1 P_1 + ... + a_r P_r) \otimes (b_1 Q_1 + ... + b_s Q_s).
+
+    //Isogenous curves get automatic contributions
     IsIsog, psi := IsIsogenous(C1, C2);
-    if false then //IsIsog then
+    if IsIsog then
         C1basis := ReducedBasis(Generators(C1));
         C2basis := [psi(P) : P in C1basis];
-        prod_basis := [<[i eq j select 1 else 0 : i in [1..#C1basis]], [i eq j select 1 else 0 : i in [1..#C1basis]]> : j in [1..#C1basis]];
+        prod_basis := [<[i eq j select 1 else 0 : i in [1..#C1basis]], 
+                        [i eq j select 1 else 0 : i in [1..#C1basis]]> : j in [1..#C1basis]];
+        generators +:= #C1basis;
     end if;
 
+    // A modification of prod_basis, used for testing linear independence
     prod_vect_basis := [TensorProd(pair, #C1basis, #C2basis) : pair in prod_basis];
 
-    while not success and attempt le 1 do
+    curvenum := 1; // there are 6 curves H to consider
+    while #prod_basis lt max_rank and curvenum le max_curves do
         //Define a hyperelliptic curve with maps to C1 and C2
-        Hexists, H, f1, f2 := HyperWithMaps(C1, C2 : option:=attempt);
+        Hexists, H, f1, f2 := HyperWithMaps(C1, C2 : option:=curvenum);
 
         if Hexists then
             //Find points on H
             pts := RationalPoints(H: Bound:=search_bound);
             Wpts := [P:P in pts | -P eq P];
-            nonWpts := [P:P in pts | -P ne P and f1(P) ne C1 ! 0 and f2(P) ne C2 ! 0];
-            // The points mapping to the identity under f1 or f2 will not help us;
-            // also, these are the only non-Weierstrass points that are fixed by x -> -x or y -> -y.
-            assert #nonWpts mod 4 eq 0;
+            Hpts := [P:P in pts | 2*f1(P) ne C1 ! 0 and 2*f2(P) ne C2 ! 0];
+            assert #Hpts mod 4 eq 0;
             
-            if #Wpts ne 0 and #nonWpts ne 0 then 
-                total_orbits +:= #nonWpts / 4;       
-                // Find the images of P-W on E1 and E2 for non-Weierstrass P and Weierstrass W.
-                W := Wpts[1]; // other choices of W will differ by 2-torsion
-                old_num := #prod_basis;
-                for P in nonWpts do
-                    GrowBasis(f1(P)-f1(W), f2(P)-f2(W), P, ~C1basis, ~C2basis, ~Hpts, ~prod_basis, ~prod_vect_basis);
+            if #Wpts ne 0 and #Hpts ne 0 then 
+                generators +:= #Hpts / 4;       
+                for P in Hpts do
+                    // Add f1(P), f2(P), and f1(P)\otimes f2(P) to C1basis, C2basis, 
+                    // and prod_basis, respectively (unless already in the span up to torsion)
+                    GrowBasis(f1(P), f2(P), ~C1basis, ~C2basis, ~prod_basis, ~prod_vect_basis);
                 end for;
-
-                if #prod_basis eq rank1 * rank2 then
-                    return true, [total_orbits, #prod_basis];
-                end if;
             end if;
         end if;
-        attempt +:= 1;
+        curvenum +:= 1;
     end while;
-    return #prod_basis eq rank1 * rank2, [total_orbits, #prod_basis];
+    print prod_vect_basis;
+    assert generators ge #prod_basis;
+    return #prod_basis, generators;
 end function;
 
 
-FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false, progress_markers := 100); //progress_markers:=10^10
+FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false, progress_markers := 100, max_curves := 6);
                             
-    /* Returns a list of pairs of curves (one from list1, one from list2) 
-    with some property I'll describe later */
+    /* every element of pairlist is a pair <C1,C2>, where C1,C2 are elliptic 
+    curves with fully rational 2-torsion.
+    Return a list "successes" of integers, and a list "alldata" of pairs of integers.
+
+    "successes" contains a collection of indices i such that if <C1,C2> = pairlist[i], 
+    then F^2(C1xC2)_comp is provably finite.
+
+    "alldata" is a list of the same length as pairlist: if <C1,C2> = pairlist[i], 
+    alldata[i] is the output of 
+    ProcessPair(C1, C2 : search_bound:=search_bound, max_rank := Rank(C1)*Rank(C2), max_curves := max_curves).
+
+    Parameters:
+
+    "search_bound", "max_curves" : parameters passed to ProcessPair (see explanation there).
+    "constantrank" : if false, the ranks of every curve in pairlist will be computed, which is 
+    potentially time-intensive. Setting constantrank:=true will compute r1:=Rank(C1) and
+    r2:=Rank(C2) of the first pair <C1,C2>, then assume r1=Rank(C1) and r2=Rank(C2) for all
+    following pairs <C1,C2>.
+    "progress_markers": print "n / total" after n steps if n is a multiple of progress_markers. */
 
     successes := [];
     alldata := [];
-
-    if constantrank then 
-        rank1 := Rank(pairlist[1][1]);
-        rank2 := Rank(pairlist[1][2]);
-    else 
-        rank1 := -1; 
-        rank2 := -1;
-    end if;
+    curveranks := AssociativeArray();
     
     for i in [1..#pairlist] do
         if i mod progress_markers eq 0 then print i,"/",#pairlist; end if;
         C1 := pairlist[i][1];
         C2 := pairlist[i][2];
-        
-        goodpair, data := ProcessPair(C1, C2 : search_bound:=search_bound, rank1:=rank1, rank2:=rank2);
-        Append(~alldata, data);
-        if goodpair then Append(~successes, i); 
+        if not constantrank or i eq 1 then
+            r1 := IsDefined(curveranks, C1) select curveranks[C1] else Rank(C1);
+            curveranks[C1] := r1;
+            r2 := IsDefined(curveranks, C2) select curveranks[C2] else Rank(C2);
+            curveranks[C2] := r2;
         end if;
+        
+        tensorrank, generators := ProcessPair(C1, C2 : search_bound:=search_bound, max_rank := r1*r2, max_curves := max_curves);
+        Append(~alldata, <tensorrank, generators>);
+        if tensorrank eq r1*r2 then Append(~successes, i); end if;
     end for;
     
     return successes, alldata;
 end function;
-
-//OVER QUADRATIC EXTENSIONS (SET x COORDINATE xval arbitrarily)
-/*
-total := 0;
-successes := 0;
-for i in [1..10] do
-    a := xcoords[i][1]-xcoords[i][3];
-    b := xcoords[i][2]-xcoords[i][3];
-    for j in [1..i-1] do
-        total +:= 1;
-        c := xcoords[j][1]-xcoords[j][3];
-        d := xcoords[j][2]-xcoords[j][3];
-        
-        for height in [1..20] do
-            for q in [1..height] do
-                p := height-q;
-                if GCD(p,q) eq 1 and p/q ne 4/3 then
-                    xval := p/q;
-                    if IsIrreducible(Evaluate(DefiningPolynomial(H),[xval,X,1])) then
-                        K<r> := NumberField(Evaluate(DefiningPolynomial(H),[xval,X,1]));
-                        HK := BaseChange(H,K);
-                        tf, HH, f := IsHyperelliptic(HK);
-                        
-                        E1 := EllipticCurve(X*(X-a)*(X-b));
-                        E1K := BaseChange(E1, K);
-                        f1 := map<HK -> E1K | [(a*b*(a-b))/(a*d - b*c) * (x^2 - z^2*(c - d)/(a - b))*z, (a*b*(a - b))/(a*d - b*c)^2*y, z^3]>;
-                        E2 := EllipticCurve(X*(X-c)*(X-d));
-                        E2K := BaseChange(E2, K);
-                        f2 := map<HK -> E2K | [(c*d*(c-d))/(-a*d + b*c) * (z^2 - x^2*(a - b)/(c - d))*x, (c*d*(c - d))/(-a*d + b*c)^2*y, x^3]>;
-
-                        P1:= E1K ! Generators(E1)[3];
-                        Q1:= f1(HK![xval,r,1]);
-                        if not IsLinearlyIndependent(P1,Q1) then
-                            print <xval,i,j,P1,Q1>;
-                        end if;
-                        P2:= E2K ! Generators(E2)[3];
-                        Q2:= f2(HK![xval,r,1]);
-                        if not IsLinearlyIndependent(P2,Q2) then
-                            print <xval,i,j,P2,Q2>;
-                        end if;
-                    end if;
-                end if;
-            end for;
-        end for;
-    end for;
-end for;
-
-
-
-h := Inverse(f);
-pts := RationalPoints(HH:Bound:=100);
-Wpts := [P:P in pts | -P eq P];
-nonWpts := [P:P in pts | -P ne P];
-
-E1a := BaseChange(WeierstrassModel(curves[i]),K);
-E1 := BaseChange(EllipticCurve(X*(X-a)*(X-b)),K);
-g1 := Isomorphism(E1,E1a);
-f1 := map<H -> E1 | [(a*b*(a-b))/(a*d - b*c) * (x^2 - z^2*(c - d)/(a - b))*z, (a*b*(a - b))/(a*d - b*c)^2*y, z^3]>;
-E2a := BaseChange(WeierstrassModel(curves[j]),K);
-E2 := BaseChange(EllipticCurve(X*(X-c)*(X-d)),K);
-g2 := Isomorphism(E2,E2a);
-f2 := map<H -> E2 | [(c*d*(c-d))/(-a*d + b*c) * (z^2 - x^2*(a - b)/(c - d))*x, (c*d*(c - d))/(-a*d + b*c)^2*y, x^3]>;
-
-S1:=[];
-S2:=[];
-for Wpt in Wpts do
-    for nonWpt in nonWpts do
-        if Order(g1(f1(h(Wpt))) - g1(f1(h(nonWpt)))) eq 0 and Order(g2(f2(h(Wpt))) - g2(f2(h(nonWpt)))) eq 0 then
-            Append(~S1, g1(f1(h(Wpt))) - g1(f1(h(nonWpt))));
-            Append(~S2, g2(f2(h(Wpt))) - g2(f2(h(nonWpt))));
-        end if;
-    end for;
-end for;
-ReducedBasis(S);
-
-
-// ONE RANK 1 and ONE RANK 2
-
-load "rank1torsion22.m";
-curves1 := make_data();
-load "rank3torsion22.m";
-curves2 := make_data();
-
-xcoords1 := [];
-for C in curves1 do
-    E := WeierstrassModel(C);
-    Append(~xcoords1, [P[1] : P in DivisionPoints(E!0, 2) | P ne E!0]);   
-end for;
-xcoords2 := [];
-for C in curves2 do
-    E := WeierstrassModel(C);
-    Append(~xcoords2, [P[1] : P in DivisionPoints(E!0, 2) | P ne E!0]);   
-end for;
-
-PP<x,y,z> := ProjectiveSpace(Rationals(), [1,3,1]);
-Pol<X> := PolynomialRing(Rationals());
-
-total := 0;
-successes := 0;
-numpts := [];
-for i in [1..500] do
-    print i,successes;
-    a := xcoords1[i][1]-xcoords1[i][3];
-    b := xcoords1[i][2]-xcoords1[i][3];
-    for j in [1..20] do
-        total +:= 1;
-        c := xcoords2[j][1]-xcoords2[j][3];
-        d := xcoords2[j][2]-xcoords2[j][3];
-        H := Curve(PP, y^2 - (a*d-b*c)*((a-b)*x^2-(c-d)*z^2)*(a*x^2-c*z^2)*(b*x^2-d*z^2));
-        tf, HH, f := IsHyperelliptic(H);
-        if tf then
-            HH, g := IntegralModel(HH);
-            h := Inverse(f*g);
-            pts := RationalPoints(HH:Bound:=1000);
-            Wpts := [P:P in pts | -P eq P];
-            nonWpts := [P:P in pts | -P ne P];
-                    
-            if #Wpts ne 0 and #nonWpts ne 0 then
-                Append(~numpts, #nonWpts);
-                E1a := WeierstrassModel(curves1[i]);
-                E1 := EllipticCurve(X*(X-a)*(X-b));
-                g1 := Isomorphism(E1,E1a);
-                f1 := map<H -> E1 | [(a*b*(a-b))/(a*d - b*c) * (x^2 - z^2*(c - d)/(a - b))*z, (a*b*(a - b))/(a*d - b*c)^2*y, z^3]>;
-                E2a := WeierstrassModel(curves2[j]);
-                E2 := EllipticCurve(X*(X-c)*(X-d));
-                g2 := Isomorphism(E2,E2a);
-                f2 := map<H -> E2 | [(c*d*(c-d))/(-a*d + b*c) * (z^2 - x^2*(a - b)/(c - d))*x, (c*d*(c - d))/(-a*d + b*c)^2*y, x^3]>;
-                E1pts := [];
-                E2pts := [];
-                for nonWpt in nonWpts do
-                    if Order(g1(f1(h(Wpts[1]))) - g1(f1(h(nonWpt)))) eq 0 then
-                        Append(~E1pts, g1(f1(h(Wpts[1]))) - g1(f1(h(nonWpt))));
-                        Append(~E2pts, g2(f2(h(Wpts[1]))) - g2(f2(h(nonWpt))));
-                    end if;
-                end for;
-                if #ReducedBasis(E1pts) ge 1 and #ReducedBasis(E2pts) ge 3 then
-                    successes+:=1;
-                end if;      
-            end if;
-        end if;
-    end for;
-end for;
-*/
