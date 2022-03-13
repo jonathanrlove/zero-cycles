@@ -6,15 +6,15 @@ rank2curves := make_data();
 load "maps_from_hyperelliptic/lmfdb-rank3torsion22.m";
 rank3curves := make_data();
 
-shortrank1pairs := &cat[[<rank1curves[i], rank1curves[j]> : j in [1..i]] : i in [1..10]];
-rank1pairs := &cat[[<rank1curves[i], rank1curves[j]> : j in [1..i]] : i in [1..100]];
+shortrank1pairs := &cat[[<rank1curves[i], rank1curves[j]> : j in [1..i-1]] : i in [1..10]];
+rank1nonisopairs := &cat[[<rank1curves[i], rank1curves[j]> : j in [1..i-1]] : i in [1..100]];
+rank2nonisopairs := &cat[[<rank2curves[i], rank2curves[j]> : j in [1..i-1]] : i in [1..100]]; 
+rank2diagonal := [<rank2curves[i], rank2curves[i]> : i in [1..100]]; 
+rank3nonisopairs := &cat[[<rank3curves[i], rank3curves[j]> : j in [1..i-1]] : i in [1..20]]; 
+rank3diagonal := [<rank3curves[i], rank3curves[i]> : i in [1..20]]; 
 rank1rank2 := &cat[[<rank1curves[i], rank2curves[j]> : j in [1..100]] : i in [1..100]]; 
 rank1rank3 := &cat[[<rank1curves[i], rank3curves[j]> : j in [1..20]] : i in [1..500]]; 
-rank2distinctpairs := &cat[[<rank2curves[i], rank2curves[j]> : j in [1..i-1]] : i in [1..100]]; 
-rank2diagonal := [<rank2curves[i], rank2curves[i]> : i in [1..100]]; 
 rank2rank3 := &cat[[<rank2curves[i], rank3curves[j]> : j in [1..20]] : i in [1..500]]; 
-shortrank2rank3 := &cat[[<rank2curves[i], rank3curves[j]> : j in [1..10]] : i in [1..10]]; 
-rank3pairs := &cat[[<rank3curves[i], rank3curves[j]> : j in [1..i]] : i in [1..20]]; 
 
 /* ~~~~~~~~~~ INSTRUCTIONS ~~~~~~~~~~
 
@@ -41,10 +41,16 @@ max_curves must be an integer from 1 to 6, inclusive. This determines the maximu
 genlist determines how comprehensive the returned information is; see below.
 */
 
-pairlist := shortrank1pairs;
+pairlist := rank3nonisopairs;
 successes, alldata := FindGoodPairs(pairlist : search_bound := 1000, constantrank := true, 
                                                progress_markers := 100, max_curves := 6, genlist := false);
 print #successes, " out of ", #pairlist;
+
+pairlist := rank3diagonal;
+successes, alldata := FindGoodPairs(pairlist : search_bound := 1000, constantrank := true, 
+                                               progress_markers := 100, max_curves := 6, genlist := false);
+print #successes, " out of ", #pairlist;
+
 
 
 /* ~~~~~~~~~~ OUTPUT INTERPRETATION ~~~~~~~~~~ 
@@ -64,12 +70,13 @@ if genlist:=true, then for each i, alldata[i] is a list of tuples <P,f1,f2>, whe
 if genlist:=false, alldata[i] as above is replaced with its length.
 
 Sample outputs:
-if pairlist := shortrank1pairs, "29 out of 55"
-if pairlist := rank1pairs, "1169 out of 5050"
-if pairlist := rank1rank2, "545 out of 10000"
-if pairlist := rank1rank3, "56 out of 10000"
-if pairlist := rank2distinctpairs, "69 out of 4950"
-if pairlist := rank2diagonal, "4 out of 100"
-if pairlist := rank2rank3, "30 out of 10000"
-if pairlist := rank3pairs, "0 out of 210"
+if pairlist := shortrank1pairs, "30 out of 45"
+if pairlist := rank1nonisopairs, "2602 out of 4950"
+if pairlist := rank2nonisopairs, "995 out of 4950"
+if pairlist := rank2diagonal, "70 out of 100"
+if pairlist := rank3nonisopairs, "_ out of 190"
+if pairlist := rank3diagonal, "_ out of 20"
+if pairlist := rank1rank2, "3311 out of 10000"
+if pairlist := rank1rank3, "955 out of 10000"
+if pairlist := rank2rank3, "615 out of 10000"
 */
