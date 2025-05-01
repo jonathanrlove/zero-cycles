@@ -1,9 +1,9 @@
-load "maps_from_hyperelliptic/methods.m";
-load "maps_from_hyperelliptic/lmfdb-rank1torsion22.m";
+load "methods.m";
+load "lmfdb-rank1torsion22.m";
 rank1curves := make_data();
-load "maps_from_hyperelliptic/lmfdb-rank2torsion22.m";
+load "lmfdb-rank2torsion22.m";
 rank2curves := make_data();
-load "maps_from_hyperelliptic/lmfdb-rank3torsion22.m";
+load "lmfdb-rank3torsion22.m";
 rank3curves := make_data();
 
 shortrank1pairs := &cat[[<rank1curves[i], rank1curves[j]> : j in [1..i-1]] : i in [1..10]];
