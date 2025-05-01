@@ -1,82 +1,82 @@
-load "methods.m";
+load "pointfinding.m";
 load "lmfdb-rank1torsion22.m";
-rank1curves := make_data();
+r1t22curves := make_data();
 load "lmfdb-rank2torsion22.m";
-rank2curves := make_data();
+r2t22curves := make_data();
 load "lmfdb-rank3torsion22.m";
-rank3curves := make_data();
+r3t22curves := make_data();
 
-shortrank1pairs := &cat[[<rank1curves[i], rank1curves[j]> : j in [1..i-1]] : i in [1..10]];
-rank1nonisopairs := &cat[[<rank1curves[i], rank1curves[j]> : j in [1..i-1]] : i in [1..100]];
-rank2nonisopairs := &cat[[<rank2curves[i], rank2curves[j]> : j in [1..i-1]] : i in [1..100]]; 
-rank2diagonal := [<rank2curves[i], rank2curves[i]> : i in [1..100]]; 
-rank3nonisopairs := &cat[[<rank3curves[i], rank3curves[j]> : j in [1..i-1]] : i in [1..20]]; 
-rank3diagonal := [<rank3curves[i], rank3curves[i]> : i in [1..20]]; 
-rank1rank2 := &cat[[<rank1curves[i], rank2curves[j]> : j in [1..100]] : i in [1..100]]; 
-rank1rank3 := &cat[[<rank1curves[i], rank3curves[j]> : j in [1..20]] : i in [1..500]]; 
-rank2rank3 := &cat[[<rank2curves[i], rank3curves[j]> : j in [1..20]] : i in [1..500]]; 
+// POSSIBLE PAIRLISTS
+shortrank1pairs := &cat[[<r1t22curves[i], r1t22curves[j]> : j in [1..i-1]] : i in [1..10]];
+rank1nonisopairs := &cat[[<r1t22curves[i], r1t22curves[j]> : j in [1..i-1]] : i in [1..100]];
+rank2nonisopairs := &cat[[<r2t22curves[i], r2t22curves[j]> : j in [1..i-1]] : i in [1..100]]; 
+rank2diagonal := [<r2t22curves[i], r2t22curves[i]> : i in [1..100]]; 
+rank3nonisopairs := &cat[[<r3t22curves[i], r3t22curves[j]> : j in [1..i-1]] : i in [1..20]]; 
+rank3diagonal := [<r3t22curves[i], r3t22curves[i]> : i in [1..20]]; 
+rank1rank2 := &cat[[<r1t22curves[i], r2t22curves[j]> : j in [1..100]] : i in [1..100]]; 
+rank1rank3 := &cat[[<r1t22curves[i], r3t22curves[j]> : j in [1..20]] : i in [1..500]]; 
+rank2rank3 := &cat[[<r2t22curves[i], r3t22curves[j]> : j in [1..20]] : i in [1..500]];
+
+
+procedure test(pairlist, filename : search_bound := 1000, constantrank := true, scholten := false, section_bound := 3)
+	successes, alldata := FindGoodPairs(pairlist : search_bound := search_bound, constantrank := constantrank, 
+                                                   scholten := scholten, section_bound := section_bound, filename := filename);
+    for q in Setseq(Seqset([i[2] : i in successes])) do
+        fprintf filename, "%o\n", <q, #[i : i in successes | i[2] eq q]>;
+    end for;
+end procedure; 
 
 /* ~~~~~~~~~~ INSTRUCTIONS ~~~~~~~~~~
 
-Set pairlist to be any list of pairs of elliptic curves over the rationals 
-    with fully rational 2-torsion. A selection of some options for pairlist 
-    is given above.
+After loading this file, run
 
-search_bound is a height bound used to find points on certain genus 2 hyperelliptic
+test(pairlist, filename);
+
+with pairlist set to be any list of pairs of elliptic curves over the rationals 
+    with fully rational 2-torsion (a selection of some options for pairlist is 
+    given in the section labelled "POSSIBLE PAIRLISTS" above), and filename
+    is a string ending with .txt. For example:
+
+test(shortrank1pairs, "data.txt");
+
+OPTIONS:
+
+search_bound is a height bound used to find points on certain hyperelliptic
     curves. Larger values may produce more successes, but may take longer.
 
 constantrank should be set to true only if there are constants r1, r2 such that 
     rank(C1)=r1 and rank(C2)=r2 for all <C1,C2> in the list of curve pairs. 
-    (This holds for all the lists of pairs given above.)
+    (This holds for all the lists of pairs in "POSSIBLE PAIRLISTS" above.)
     This saves the need to compute the rank for every curve separately, but yields 
-    incorrect results if the assumption does not hold.
+    incorrect results if this assumption does not hold.
 
-The code will print "n / [length of list]" when processing the nth pair, where n
-    is a multiple of progress_markers.
+scholten is a Boolean value that determines whether relations arising from the
+    six Scholten curves should be counted separately.
 
-max_curves must be an integer from 1 to 6, inclusive. This determines the maximum number
-    of covers H->C1 and H->C2 to use. Lower values will run faster but produce 
-    fewer successes.
+section_bound is a natural number that determines the number of curves to check
+    from each fibration.
 
-genlist determines how comprehensive the returned information is; see below.
-*/
+OUTPUT:
 
-pairlist := rank3nonisopairs;
-successes, alldata := FindGoodPairs(pairlist : search_bound := 1000, constantrank := true, 
-                                               progress_markers := 100, max_curves := 6, genlist := false);
-print #successes, " out of ", #pairlist;
+For each pair <C1, C2> in pairlist, the code will print a line 
 
-pairlist := rank3diagonal;
-successes, alldata := FindGoodPairs(pairlist : search_bound := 1000, constantrank := true, 
-                                               progress_markers := 100, max_curves := 6, genlist := false);
-print #successes, " out of ", #pairlist;
+i / n: [a1, a2, a3, a4, a5], [b1, b2, b3, b4]
 
+where
+- n is the total number of pairs in pairlist;
+- i is the index of the pair <C1, C2>;
+- a1+...+a5 is the number of independent relations found using hyperelliptic points on C1xC2, with
+    - a1 counting relations arising from isogenies C1 -> C2;
+    - a2 counting additional relations arising from Scholten curves (if scholten := true) 
+    - a3 counting additional relations arising from fibration
+    - a4 counting additional relations arising from modifying C1,C2 by isogenies first and then using Scholten curves
+    - a5 counting additional relations arising from modifying C1,C2 by isogenies first and then using fibration
+- b1+...+b4 is a running total of pairs for which rank(C1)*rank(C2) independent relations have been found:
+    - b1 counting pairs for which isogenies were sufficient
+    - b2 counting pairs for which Scholten curves (in addition) were sufficient;
+    - b3 counting pairs for which fibration sections (in addition) were sufficient;
+    - b4 counting pairs for which modifying by isogenies (in addition) was sufficient
 
-
-/* ~~~~~~~~~~ OUTPUT INTERPRETATION ~~~~~~~~~~ 
-
-successes is a list of indices. If i in successes, and <C1,C2> = pairlist[i], then
-    F^2(C1xC2)_comp is torsion. If i is not in successes, the test is inconclusive.
-
-alldata is a list of the same length as pairlist.
-
-if genlist:=true, then for each i, alldata[i] is a list of tuples <P,f1,f2>, where
-    P is on a curve C, and f1:C->C1 and f2:C->C2 are maps (here <C1,C2>=pairlist[i]). 
-    As the tuple varies over alldata[i], f1(P) \otimes f2(P) will produce an
-    independent set of elements of C1(\Q)\otimes C2(\Q), all of which map to torsion
-    in F^2(C1xC2). If the length of the list of tuples equals rank(C1)*rank(C2)
-    then F^2(C1xC2)_comp is finite.
-
-if genlist:=false, alldata[i] as above is replaced with its length.
-
-Sample outputs:
-if pairlist := shortrank1pairs, "30 out of 45"
-if pairlist := rank1nonisopairs, "2602 out of 4950"
-if pairlist := rank2nonisopairs, "995 out of 4950"
-if pairlist := rank2diagonal, "70 out of 100"
-if pairlist := rank3nonisopairs, "_ out of 190"
-if pairlist := rank3diagonal, "_ out of 20"
-if pairlist := rank1rank2, "3311 out of 10000"
-if pairlist := rank1rank3, "955 out of 10000"
-if pairlist := rank2rank3, "615 out of 10000"
+After all pairs have been processed, each possible quintuple [a1,a2,a3,a4,a5] is printed 
+    together with the number of pairs <C1,C2> attaining that profile.
 */
