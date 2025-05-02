@@ -226,41 +226,44 @@ ProcessPair := function(C1, C2 : search_bound:=1000, max_rank := 10^10, max_curv
 end function;
 
 
-FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false, progress_markers := 100, max_curves := 10^10, genlist := false,
+FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false, max_curves := 10^10,
                                      scholten := true, fibration := true, isogeny := true, section_bound := 2, filename := "goodpairs.txt");
                             
     /* every element of pairlist is a pair <C1,C2>, where C1,C2 are elliptic 
     curves with fully rational 2-torsion.
 
-    NEEDS EDITING 
+    For each pair <C1, C2> in pairlist, the code will print a line to filename
 
-    Prints to filename 
-    
-    a list "successes" of integers, and a list "alldata". "successes" contains
-    a collection of indices i such that if <C1,C2> = pairlist[i], then F^2(C1xC2)_comp 
-    is provably finite. "alldata" is a list of the same length as pairlist, with entries 
-    depending on the value of genlist. 
-    
-    Suppose <C1,C2> = pairlist[i]. If genlist is true, then alldata[i] is a list
-    of tuples <P,f1,f2>, where P is on a curve C, and f1:C->C1 and f2:C->C2 are maps. As the
-    tuple varies over alldata[i], f1(P) \otimes f2(P) will produce an independent set of 
-    elements of C1(\Q)\otimes C2(\Q), all of which map to torsion in F^2(C1xC2). If the length 
-    of the list of tuples equals rank(C1)*rank(C2) then F^2(C1xC2)_comp is finite.
+    i / n: [a1, a2, a3, a4, a5], [b1, b2, b3, b4]
 
-    If genlist is false, then alldata[i] is the length of the list of tuples.
+    where
+    - n is the total number of pairs in pairlist;
+    - i is the index of the pair <C1, C2>;
+    - a1+...+a5 is the number of independent relations found using hyperelliptic points on C1xC2, with
+        - a1 counting relations arising from isogenies C1 -> C2;
+        - a2 counting additional relations arising from Scholten curves (if scholten := true) 
+        - a3 counting additional relations arising from fibration
+        - a4 counting additional relations arising from modifying C1,C2 by isogenies first and then using Scholten curves
+        - a5 counting additional relations arising from modifying C1,C2 by isogenies first and then using fibration
+    - b1+...+b4 is a running total of pairs for which rank(C1)*rank(C2) independent relations have been found:
+        - b1 is the number of pairs for which isogenies were sufficient
+        - b2 is the number of pairs for which Scholten curves (in addition) were sufficient;
+        - b3 is the number of pairs for which fibration sections (in addition) were sufficient;
+        - b4 is the number of pairs for which modifying by isogenies (in addition) was sufficient
+
+    Output: a list consisting of <i, [a1,a2,a3,a4,a5]> for each pair in pairlist.
 
     Parameters:
 
-    "search_bound", "max_curves" : parameters passed to ProcessPair (see explanation there).
+    "search_bound", "max_curves", "scholten", "fibration", "isogeny", "section_bound" : 
+        parameters passed to ProcessPair (see explanation there).
     "constantrank" : if false, the ranks of every curve in pairlist will be computed, which is 
-    potentially time-intensive. Setting constantrank:=true will compute r1:=Rank(C1) and
-    r2:=Rank(C2) of the first pair <C1,C2>, then assume r1=Rank(C1) and r2=Rank(C2) for all
-    following pairs <C1,C2>.
-    "progress_markers": print "n / total" after n steps if n is a multiple of progress_markers. 
+        potentially time-intensive. Setting constantrank:=true will compute r1:=Rank(C1) and
+        r2:=Rank(C2) of the first pair <C1,C2>, then assume r1=Rank(C1) and r2=Rank(C2) for all
+        following pairs <C1,C2>.
     "genlist" : determines the output, see above.
     */
 
-    successes := [];
     alldata := [];
     curveranks := AssociativeArray();
 
@@ -283,8 +286,7 @@ FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false
             ProcessPair(C1, C2 : search_bound:=search_bound, max_rank := r1*r2, max_curves := max_curves, 
                                  scholten := scholten, fibration := fibration, isogeny := isogeny,
                                  section_bound := section_bound);
-        Append(~alldata, genlist select generators else #generators);
-        Append(~successes, <i, genspermethod>);
+        Append(~alldata, <i, genspermethod>);
         if #generators eq r1*r2 then 
             if genspermethod[4]+genspermethod[5] gt 0 then isogenyneeded +:= 1; 
             elif genspermethod[3] gt 0 then beyondscholten +:= 1;
@@ -292,13 +294,12 @@ FindGoodPairs := function(pairlist : search_bound := 1000, constantrank := false
             else justisogenous +:= 1; end if;
         end if;
 
-        if i mod progress_markers eq 0 then 
-            fprintf filename, "%o / %o: %o, %o\n", i, #pairlist, genspermethod,
+
+        fprintf filename, "%o / %o: %o, %o\n", i, #pairlist, genspermethod,
             [justisogenous, scholtencount, beyondscholten, isogenyneeded];
-        end if;
     end for;
     
-    return successes, alldata;
+    return alldata;
 end function;
                         
 

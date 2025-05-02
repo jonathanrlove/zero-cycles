@@ -19,10 +19,10 @@ rank2rank3 := &cat[[<r2t22curves[i], r3t22curves[j]> : j in [1..20]] : i in [1..
 
 
 procedure test(pairlist, filename : search_bound := 1000, constantrank := true, scholten := false, section_bound := 3)
-	successes, alldata := FindGoodPairs(pairlist : search_bound := search_bound, constantrank := constantrank, 
+	data := FindGoodPairs(pairlist : search_bound := search_bound, constantrank := constantrank, 
                                                    scholten := scholten, section_bound := section_bound, filename := filename);
     for q in Setseq(Seqset([i[2] : i in successes])) do
-        fprintf filename, "%o\n", <q, #[i : i in successes | i[2] eq q]>;
+        fprintf filename, "%o\n", <q, #[i : i in data | i[2] eq q]>;
     end for;
 end procedure; 
 
@@ -72,11 +72,11 @@ where
     - a4 counting additional relations arising from modifying C1,C2 by isogenies first and then using Scholten curves
     - a5 counting additional relations arising from modifying C1,C2 by isogenies first and then using fibration
 - b1+...+b4 is a running total of pairs for which rank(C1)*rank(C2) independent relations have been found:
-    - b1 counting pairs for which isogenies were sufficient
-    - b2 counting pairs for which Scholten curves (in addition) were sufficient;
-    - b3 counting pairs for which fibration sections (in addition) were sufficient;
-    - b4 counting pairs for which modifying by isogenies (in addition) was sufficient
+    - b1 is the number of pairs for which isogenies were sufficient
+    - b2 is the number of pairs for which Scholten curves (in addition) were sufficient;
+    - b3 is the number of pairs for which fibration sections (in addition) were sufficient;
+    - b4 is the number of pairs for which modifying by isogenies (in addition) was sufficient
 
 After all pairs have been processed, each possible quintuple [a1,a2,a3,a4,a5] is printed 
-    together with the number of pairs <C1,C2> attaining that profile.
+    together with the number of pairs <C1,C2> attaining that quintuple.
 */
