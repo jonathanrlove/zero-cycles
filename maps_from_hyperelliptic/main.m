@@ -18,7 +18,7 @@ rank1rank3 := &cat[[<r1t22curves[i], r3t22curves[j]> : j in [1..20]] : i in [1..
 rank2rank3 := &cat[[<r2t22curves[i], r3t22curves[j]> : j in [1..20]] : i in [1..500]];
 
 
-procedure test(pairlist, filename : search_bound := 1000, constantrank := true, scholten := false, section_bound := 3)
+procedure test(pairlist, filename : search_bound := 1000, constantrank := true, scholten := true, section_bound := 3)
 	data := FindGoodPairs(pairlist : search_bound := search_bound, constantrank := constantrank, 
                                                    scholten := scholten, section_bound := section_bound, filename := filename);
     for q in Setseq(Seqset([i[2] : i in data])) do
